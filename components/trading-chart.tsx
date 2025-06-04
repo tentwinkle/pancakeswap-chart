@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { createChart, type IChartApi, type ISeriesApi } from "lightweight-charts"
+import type { IChartApi, ISeriesApi } from "lightweight-charts"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
@@ -38,12 +38,18 @@ export default function TradingChart() {
   useEffect(() => {
     if (!chartContainerRef.current) return
 
-    const chart = createChart(chartContainerRef.current, {
-      width: chartContainerRef.current.clientWidth,
-      height: 500,
-      layout: {
-        background: { color: "transparent" },
-        textColor: "#d1d5db",
+    let mounted = true
+    let chart: IChartApi | null = null
+
+    import("lightweight-charts").then(({ createChart }) => {
+      if (!mounted || !chartContainerRef.current) return
+
+      chart = createChart(chartContainerRef.current, {
+        width: chartContainerRef.current.clientWidth,
+        height: 500,
+        layout: {
+          background: { color: "transparent" },
+          textColor: "#d1d5db",
       },
       grid: {
         vertLines: { color: "#374151" },
@@ -62,32 +68,32 @@ export default function TradingChart() {
       },
     })
 
-    const candlestickSeries = chart.addCandlestickSeries({
-      upColor: "#10b981",
-      downColor: "#ef4444",
-      borderDownColor: "#ef4444",
-      borderUpColor: "#10b981",
-      wickDownColor: "#ef4444",
-      wickUpColor: "#10b981",
+      const candlestickSeries = chart.addCandlestickSeries({
+        upColor: "#10b981",
+        downColor: "#ef4444",
+        borderDownColor: "#ef4444",
+        borderUpColor: "#10b981",
+        wickDownColor: "#ef4444",
+        wickUpColor: "#10b981",
+      })
+
+      const volumeSeries = chart.addHistogramSeries({
+        color: "#6b7280",
+        priceFormat: {
+          type: "volume",
+        },
+        priceScaleId: "",
+        scaleMargins: {
+          top: 0.8,
+          bottom: 0,
+        },
+      })
+
+      chartRef.current = chart
+      candlestickSeriesRef.current = candlestickSeries
+      volumeSeriesRef.current = volumeSeries
     })
 
-    const volumeSeries = chart.addHistogramSeries({
-      color: "#6b7280",
-      priceFormat: {
-        type: "volume",
-      },
-      priceScaleId: "",
-      scaleMargins: {
-        top: 0.8,
-        bottom: 0,
-      },
-    })
-
-    chartRef.current = chart
-    candlestickSeriesRef.current = candlestickSeries
-    volumeSeriesRef.current = volumeSeries
-
-    // Handle resize
     const handleResize = () => {
       if (chartContainerRef.current && chartRef.current) {
         chartRef.current.applyOptions({
@@ -99,8 +105,9 @@ export default function TradingChart() {
     window.addEventListener("resize", handleResize)
 
     return () => {
+      mounted = false
       window.removeEventListener("resize", handleResize)
-      chart.remove()
+      if (chart) chart.remove()
     }
   }, [])
 
