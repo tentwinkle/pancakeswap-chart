@@ -6,7 +6,7 @@ export const WBNB_ADDRESS = "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"
 export const BUSD_ADDRESS = "0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56"
 
 // The Graph endpoint for PancakeSwap
-export const PANCAKESWAP_SUBGRAPH_URL = "https://api.thegraph.com/subgraphs/name/pancakeswap/exchange"
+export const PANCAKESWAP_SUBGRAPH_URL = "https://open-platform.nodereal.io/7cff02c94b6d433ba3639be22a060007/pancakeswap-free/graphql"
 
 // BNB Chain RPC
 export const BNB_RPC_URL = "https://bsc-dataseed1.binance.org/"
@@ -35,7 +35,7 @@ export const ERC20_ABI = [
 export async function fetchTopPairs(): Promise<any[]> {
   const query = `
     {
-      pairs(first: 20, orderBy: volumeUSD, orderDirection: desc, where: {volumeUSD_gt: "1000"}) {
+      pairs(first: 20, orderBy: trackedReserveBNB, orderDirection: desc) {
         id
         token0 {
           id
