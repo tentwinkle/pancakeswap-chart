@@ -24,9 +24,14 @@ export async function GET(request: NextRequest) {
     const allCandles = [...historicalCandles, ...realtimeCandles].sort((a, b) => a.time - b.time).slice(-200) // Keep last 200 candles
 
     // Generate volume data (simplified)
+    const historicalVolumes = candleAggregator.getVolumes(pair, interval)
+    const volumeMap: Record<number, number> = {}
+    for (const vol of historicalVolumes) {
+      volumeMap[vol.time] = vol.value
+    }
     const volumeData = allCandles.map((candle) => ({
       time: candle.time,
-      value: Math.random() * 1000000, // Mock volume data
+      value: volumeMap[candle.time] || 0,
       color: candle.close > candle.open ? "#10b981" : "#ef4444",
     }))
 
@@ -34,11 +39,13 @@ export async function GET(request: NextRequest) {
     const lastCandle = allCandles[allCandles.length - 1]
     const firstCandle = allCandles[Math.max(0, allCandles.length - 24)] // 24 periods ago
 
+    const volume24h = volumeData.reduce((acc, v) => acc + v.value, 0)
+
     const stats: PairStats = {
       lastPrice: lastCandle?.close || 0,
       change24h: firstCandle ? ((lastCandle.close - firstCandle.close) / firstCandle.close) * 100 : 0,
-      volume24h: Math.random() * 10000000, // Mock 24h volume
-      marketCap: Math.random() * 1000000000, // Mock market cap
+      volume24h,
+      marketCap: 0,
     }
 
     return NextResponse.json({
