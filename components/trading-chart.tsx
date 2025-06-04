@@ -18,7 +18,6 @@ const TIME_INTERVALS = [
   { value: "7D", label: "7 Days" },
   { value: "1M", label: "1 Month" },
   { value: "1Y", label: "1 Year" },
-  { value: "All", label: "All" },
 ]
 
 export default function TradingChart() {

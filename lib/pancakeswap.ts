@@ -9,8 +9,8 @@ export const BUSD_ADDRESS = "0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56"
 export const PANCAKESWAP_SUBGRAPH_URL = "https://open-platform.nodereal.io/7cff02c94b6d433ba3639be22a060007/pancakeswap-free/graphql"
 
 // BNB Chain RPC
-export const BNB_RPC_URL = "https://bsc-dataseed1.binance.org/"
-export const BNB_WS_URL = "wss://bsc-ws-node.nariox.org:443"
+export const BNB_RPC_URL = "https://bsc-dataseed.bnbchain.org/"
+export const BNB_WS_URL = "wss://ws-fapi.binance.com/ws-fapi/v1"
 
 export const provider = new ethers.JsonRpcProvider(BNB_RPC_URL)
 
@@ -149,7 +149,6 @@ export function getIntervalMs(interval: string): number {
     "7D": 7 * 24 * 60 * 60 * 1000,
     "1M": 30 * 24 * 60 * 60 * 1000,
     "1Y": 365 * 24 * 60 * 60 * 1000,
-    All: 30 * 24 * 60 * 60 * 1000,
   }
 
   return intervals[interval] || intervals["1h"]
