@@ -1,5 +1,7 @@
 import type { NextRequest } from "next/server"
 import { candleAggregator } from "@/lib/candle-aggregator"
+import { createWsProvider, createPairContract } from "@/lib/pancakeswap"
+import { ethers } from "ethers"
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
@@ -13,68 +15,70 @@ export async function GET(request: NextRequest) {
   const encoder = new TextEncoder()
 
   const stream = new ReadableStream({
-    start(controller) {
-      // Send initial connection message
+    async start(controller) {
       const data = `data: ${JSON.stringify({ type: "connected", pair, interval })}\n\n`
       controller.enqueue(encoder.encode(data))
 
-      // Simulate real-time data updates
-      const intervalId = setInterval(() => {
-        try {
-          // Generate mock swap event
-          const mockPrice = 100 + Math.random() * 900
-          const mockVolume = Math.random() * 10000
+      const wsProvider = createWsProvider()
+      const pairContract = createPairContract(pair, wsProvider)
 
-          // Add to aggregator
+      const handleSwap = async (
+        sender: string,
+        amount0In: ethers.BigNumberish,
+        amount1In: ethers.BigNumberish,
+        amount0Out: ethers.BigNumberish,
+        amount1Out: ethers.BigNumberish,
+        to: string,
+        event: any,
+      ) => {
+        try {
+          const price = amount1In > 0
+            ? Number(amount0In) / Number(amount1In)
+            : Number(amount0Out) > 0
+              ? Number(amount0Out) / Number(amount1Out)
+              : 0
+          const volume = Math.abs(Number(amount0In) - Number(amount0Out))
+          const block = await wsProvider.getBlock(event.blockNumber)
           candleAggregator.addSwapEvent(
             {
-              timestamp: Date.now(),
-              price: mockPrice,
-              volume: mockVolume,
+              timestamp: block.timestamp * 1000,
+              price,
+              volume,
               pair,
             },
             interval,
           )
-
-          // Get latest candle and volume
           const latestCandle = candleAggregator.getLatestCandle(pair, interval)
           const latestVolume = candleAggregator.getLatestVolume(pair, interval)
-
           if (latestCandle) {
-            const candleData = `data: ${JSON.stringify({
-              type: "candle",
-              candle: latestCandle,
-            })}\n\n`
+            const candleData = `data: ${JSON.stringify({ type: "candle", candle: latestCandle })}\n\n`
             controller.enqueue(encoder.encode(candleData))
           }
-
           if (latestVolume) {
-            const volumeData = `data: ${JSON.stringify({
-              type: "volume",
-              volume: latestVolume,
-            })}\n\n`
+            const volumeData = `data: ${JSON.stringify({ type: "volume", volume: latestVolume })}\n\n`
             controller.enqueue(encoder.encode(volumeData))
           }
 
-          // Send updated stats
           const statsData = `data: ${JSON.stringify({
             type: "stats",
             stats: {
-              lastPrice: mockPrice,
-              change24h: (Math.random() - 0.5) * 10,
-              volume24h: Math.random() * 10000000,
-              marketCap: Math.random() * 1000000000,
+              lastPrice: price,
+              change24h: 0,
+              volume24h: latestVolume?.value ?? 0,
+              marketCap: 0,
             },
           })}\n\n`
           controller.enqueue(encoder.encode(statsData))
-        } catch (error) {
-          console.error("Stream error:", error)
+        } catch (err) {
+          console.error("Swap event error", err)
         }
-      }, 5000) // Update every 5 seconds
+      }
 
-      // Cleanup on close
+      pairContract.on("Swap", handleSwap)
+
       request.signal.addEventListener("abort", () => {
-        clearInterval(intervalId)
+        pairContract.off("Swap", handleSwap)
+        wsProvider.destroy()
         controller.close()
       })
     },

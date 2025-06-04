@@ -10,8 +10,13 @@ export const PANCAKESWAP_SUBGRAPH_URL = "https://api.thegraph.com/subgraphs/name
 
 // BNB Chain RPC
 export const BNB_RPC_URL = "https://bsc-dataseed1.binance.org/"
+export const BNB_WS_URL = "wss://bsc-ws-node.nariox.org:443"
 
 export const provider = new ethers.JsonRpcProvider(BNB_RPC_URL)
+
+export function createWsProvider() {
+  return new ethers.WebSocketProvider(BNB_WS_URL)
+}
 
 // PancakeSwap Pair ABI (minimal)
 export const PAIR_ABI = [
@@ -65,36 +70,72 @@ export async function fetchTopPairs(): Promise<any[]> {
   }
 }
 
-export async function fetchHistoricalCandles(pairAddress: string, interval: string, limit = 100) {
-  // This would typically fetch from The Graph or another data source
-  // For demo purposes, we'll generate sample data
-  const now = Date.now()
+export async function fetchHistoricalCandles(
+  pairAddress: string,
+  interval: string,
+  limit = 100,
+) {
   const intervalMs = getIntervalMs(interval)
+  const endTime = Math.floor(Date.now() / 1000)
+  const startTime = endTime - Math.floor((intervalMs * limit) / 1000)
 
-  const candles = []
-  let basePrice = 100 + Math.random() * 900 // Random base price
+  const query = `{
+    swaps(first: 1000, orderBy: timestamp, orderDirection: asc, where: { pair: \"${pairAddress}\", timestamp_gt: ${startTime} }) {
+      amount0In
+      amount1In
+      amount0Out
+      amount1Out
+      timestamp
+    }
+  }`
 
-  for (let i = limit; i >= 0; i--) {
-    const time = Math.floor((now - i * intervalMs) / 1000)
-    const open = basePrice
-    const volatility = 0.02 // 2% volatility
-    const change = (Math.random() - 0.5) * volatility * basePrice
-    const close = open + change
-    const high = Math.max(open, close) + Math.random() * volatility * basePrice * 0.5
-    const low = Math.min(open, close) - Math.random() * volatility * basePrice * 0.5
-
-    candles.push({
-      time,
-      open,
-      high,
-      low,
-      close,
+  try {
+    const res = await fetch(PANCAKESWAP_SUBGRAPH_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query }),
     })
+    const json = await res.json()
+    const swaps = json.data.swaps as Array<any>
 
-    basePrice = close
+    const candles: any[] = []
+    const grouped: Record<number, any[]> = {}
+
+    for (const swap of swaps) {
+      const price = swap.amount1In > 0
+        ? Number(swap.amount0In) / Number(swap.amount1In)
+        : Number(swap.amount1Out) > 0
+          ? Number(swap.amount0Out) / Number(swap.amount1Out)
+          : 0
+      const volume = Math.abs(Number(swap.amount0In) - Number(swap.amount0Out))
+      const bucket = Math.floor((Number(swap.timestamp) * 1000) / intervalMs) * intervalMs
+      if (!grouped[bucket]) grouped[bucket] = []
+      grouped[bucket].push({ price, volume, time: bucket })
+    }
+
+    const buckets = Object.keys(grouped).sort((a, b) => Number(a) - Number(b))
+
+    for (const key of buckets) {
+      const items = grouped[Number(key)]
+      if (!items.length) continue
+      const open = items[0].price
+      const close = items[items.length - 1].price
+      const high = Math.max(...items.map((i) => i.price))
+      const low = Math.min(...items.map((i) => i.price))
+      candles.push({
+        time: Math.floor(Number(key) / 1000),
+        open,
+        high,
+        low,
+        close,
+      })
+    }
+
+    return candles.slice(-limit)
+  } catch (err) {
+    console.error("Error fetching historical candles", err)
+    return []
   }
-
-  return candles
 }
 
 export function getIntervalMs(interval: string): number {
@@ -103,14 +144,17 @@ export function getIntervalMs(interval: string): number {
     "5m": 5 * 60 * 1000,
     "15m": 15 * 60 * 1000,
     "1h": 60 * 60 * 1000,
-    "4h": 4 * 60 * 60 * 1000,
-    "1d": 24 * 60 * 60 * 1000,
-    "1w": 7 * 24 * 60 * 60 * 1000,
+    "5h": 5 * 60 * 60 * 1000,
+    "24h": 24 * 60 * 60 * 1000,
+    "7D": 7 * 24 * 60 * 60 * 1000,
+    "1M": 30 * 24 * 60 * 60 * 1000,
+    "1Y": 365 * 24 * 60 * 60 * 1000,
+    All: 30 * 24 * 60 * 60 * 1000,
   }
 
   return intervals[interval] || intervals["1h"]
 }
 
-export function createPairContract(pairAddress: string) {
-  return new ethers.Contract(pairAddress, PAIR_ABI, provider)
+export function createPairContract(pairAddress: string, prov: ethers.Provider = provider) {
+  return new ethers.Contract(pairAddress, PAIR_ABI, prov)
 }
