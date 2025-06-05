@@ -67,7 +67,7 @@ export default function TradingChart() {
       },
     })
 
-      const candlestickSeries = chart.addCandlestickSeries({
+      const candlestickSeries = (chart as any).addCandlestickSeries({
         upColor: "#10b981",
         downColor: "#ef4444",
         borderDownColor: "#ef4444",
@@ -76,7 +76,7 @@ export default function TradingChart() {
         wickUpColor: "#10b981",
       })
 
-      const volumeSeries = chart.addHistogramSeries({
+      const volumeSeries = (chart as any).addHistogramSeries({
         color: "#6b7280",
         priceFormat: {
           type: "volume",
@@ -264,7 +264,7 @@ export default function TradingChart() {
                 }`}
               >
                 {pairStats.change24h >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-                {pairStats.change24h.toFixed(2)}%
+                {pairStats.change24h?.toFixed(2)}%
               </div>
             </CardContent>
           </Card>

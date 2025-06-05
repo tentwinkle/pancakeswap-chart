@@ -9,8 +9,8 @@ export const BUSD_ADDRESS = "0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56"
 export const PANCAKESWAP_SUBGRAPH_URL = "https://open-platform.nodereal.io/7cff02c94b6d433ba3639be22a060007/pancakeswap-free/graphql"
 
 // BNB Chain RPC
-export const BNB_RPC_URL = "https://bsc-dataseed.bnbchain.org/"
-export const BNB_WS_URL = "wss://ws-fapi.binance.com/ws-fapi/v1"
+export const BNB_RPC_URL = "https://bnb-mainnet.g.alchemy.com/v2/0kPf5de5qDvSmSYPFENfTZGVnuYjkN-7"
+export const BNB_WS_URL = "wss://bnb-mainnet.g.alchemy.com/v2/0kPf5de5qDvSmSYPFENfTZGVnuYjkN-7"
 
 export const provider = new ethers.JsonRpcProvider(BNB_RPC_URL)
 

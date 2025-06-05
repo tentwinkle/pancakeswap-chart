@@ -3,6 +3,10 @@ import { candleAggregator } from "@/lib/candle-aggregator"
 import { createWsProvider, createPairContract } from "@/lib/pancakeswap"
 import { ethers } from "ethers"
 
+// Ensure this route runs in a Node.js environment as it relies on the `ws`
+// package which is not compatible with the Edge runtime.
+export const runtime = "nodejs"
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const pair = searchParams.get("pair")
