@@ -13,8 +13,9 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Fetch historical candles
-    const historicalCandles = await fetchHistoricalCandles(pair, interval)
+    // Fetch historical candles and volumes
+    const { candles: historicalCandles, volumes: historicalVolumes } =
+      await fetchHistoricalCandles(pair, interval)
 
     // Get real-time candles from aggregator
     const realtimeCandles = candleAggregator.getCandles(pair, interval)
@@ -25,8 +26,11 @@ export async function GET(request: NextRequest) {
     // Generate volume data (simplified)
     const realtimeVolumes = candleAggregator.getVolumes(pair, interval)
     const volumeMap: Record<number, number> = {}
-    for (const vol of realtimeVolumes) {
+    for (const vol of historicalVolumes) {
       volumeMap[vol.time] = vol.value
+    }
+    for (const vol of realtimeVolumes) {
+      volumeMap[vol.time] = (volumeMap[vol.time] || 0) + vol.value
     }
     const volumeData = allCandles.map((candle) => ({
       time: candle.time,

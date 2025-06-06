@@ -1,4 +1,5 @@
 import { ethers } from "ethers";
+import type { CandleData, VolumeData } from "@/types/trading";
 
 // PancakeSwap V2 Factory and common addresses
 export const PANCAKESWAP_V2_FACTORY =
@@ -82,7 +83,7 @@ export async function fetchHistoricalCandles(
   pairAddress: string,
   interval: string,
   limit = 100
-) {
+): Promise<{ candles: CandleData[]; volumes: VolumeData[] }> {
   const intervalMs = getIntervalMs(interval);
   const endTime = Math.floor(Date.now() / 1000);
   const startTime = endTime - Math.floor((intervalMs * limit) / 1000);
@@ -106,7 +107,8 @@ export async function fetchHistoricalCandles(
     const json = await res.json();
     const swaps = json.data.swaps as Array<any>;
 
-    const candles: any[] = [];
+    const candles: CandleData[] = [];
+    const volumes: VolumeData[] = [];
     const grouped: Record<number, any[]> = {};
 
     for (const swap of swaps) {
@@ -131,19 +133,19 @@ export async function fetchHistoricalCandles(
       const close = items[items.length - 1].price;
       const high = Math.max(...items.map((i) => i.price));
       const low = Math.min(...items.map((i) => i.price));
-      candles.push({
-        time: Math.floor(Number(key) / 1000),
-        open,
-        high,
-        low,
-        close,
-      });
+      const volume = items.reduce((acc, i) => acc + i.volume, 0);
+      const time = Math.floor(Number(key) / 1000);
+      candles.push({ time, open, high, low, close });
+      volumes.push({ time, value: volume, color: close > open ? "#10b981" : "#ef4444" });
     }
 
-    return candles.slice(-limit);
+    return {
+      candles: candles.slice(-limit),
+      volumes: volumes.slice(-limit),
+    };
   } catch (err) {
     console.error("Error fetching historical candles", err);
-    return [];
+    return { candles: [], volumes: [] };
   }
 }
 

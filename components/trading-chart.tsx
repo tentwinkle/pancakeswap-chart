@@ -53,6 +53,10 @@ export default function TradingChart() {
         },
         rightPriceScale: {
           borderColor: "#4b5563",
+          scaleMargins: {
+            top: 0.1,
+            bottom: 0.3,
+          },
         },
         timeScale: {
           borderColor: "#4b5563",
@@ -75,9 +79,12 @@ export default function TradingChart() {
         priceFormat: {
           type: "volume",
         },
-        priceScaleId: "",
+        priceScaleId: "volume",
+      })
+
+      ;(chart as any).priceScale("volume").applyOptions({
         scaleMargins: {
-          top: 0.5,
+          top: 0.7,
           bottom: 0,
         },
       })
