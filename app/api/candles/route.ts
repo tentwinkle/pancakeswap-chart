@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { fetchHistoricalCandles, fetchPairPrice, fetchPairInfo } from "@/lib/pancakeswap"
+import { fetchHistoricalCandles, fetchPairPrice, fetchPairInfo, getIntervalMs } from "@/lib/pancakeswap"
 import { candleAggregator } from "@/lib/candle-aggregator"
 import type { PairStats } from "@/types/trading"
 
@@ -50,8 +50,11 @@ export async function GET(request: NextRequest) {
       change24h = ((actualLastPrice - firstCandle.open) / firstCandle.open) * 100
     }
 
-    // Calculate volume (sum of recent periods)
-    const volume24h = volumeData.slice(-24).reduce((acc, v) => acc + v.value, 0)
+    // Calculate volume over the last 24 hours based on interval
+    const candlesPerDay = Math.floor((24 * 60 * 60 * 1000) / getIntervalMs(interval))
+    const volume24h = volumeData
+      .slice(-candlesPerDay)
+      .reduce((acc, v) => acc + v.value, 0)
 
     // Calculate market cap (simplified - would need token supply data)
     const marketCap = pairInfo ? Number.parseFloat(pairInfo.reserveUSD) * 2 : 0 // Rough estimate

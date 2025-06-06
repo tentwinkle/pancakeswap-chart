@@ -11,6 +11,18 @@ This sample app demonstrates a real-time candlestick chart built with **Next.js 
 
 ## Setup
 
+1. Copy `.env.example` to `.env` and fill in your endpoints:
+
+   - `PANCAKESWAP_SUBGRAPH_URL` – The Graph endpoint for PancakeSwap
+   - `BNB_RPC_URL` – HTTP RPC provider URL
+   - `BNB_WS_URL` – WebSocket RPC provider URL
+
+```bash
+cp .env.example .env
+```
+
+2. Install dependencies and start the dev server:
+
 ```bash
 pnpm install
 pnpm dev

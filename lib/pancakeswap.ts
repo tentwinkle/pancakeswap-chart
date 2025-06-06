@@ -7,14 +7,11 @@ export const WBNB_ADDRESS = "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c";
 export const BUSD_ADDRESS = "0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56";
 
 // The Graph endpoint for PancakeSwap
-export const PANCAKESWAP_SUBGRAPH_URL =
-  "https://open-platform.nodereal.io/7cff02c94b6d433ba3639be22a060007/pancakeswap-free/graphql";
+export const PANCAKESWAP_SUBGRAPH_URL = process.env.PANCAKESWAP_SUBGRAPH_URL!;
 
 // BNB Chain RPC
-export const BNB_RPC_URL =
-  "https://bnb-mainnet.g.alchemy.com/v2/0kPf5de5qDvSmSYPFENfTZGVnuYjkN-7";
-export const BNB_WS_URL =
-  "wss://bnb-mainnet.g.alchemy.com/v2/0kPf5de5qDvSmSYPFENfTZGVnuYjkN-7";
+export const BNB_RPC_URL = process.env.BNB_RPC_URL!;
+export const BNB_WS_URL = process.env.BNB_WS_URL!;
 
 let _provider: ethers.JsonRpcProvider | null = null;
 
@@ -157,7 +154,7 @@ export function getIntervalMs(interval: string): number {
     "15m": 15 * 60 * 1000,
   };
 
-  return intervals[interval] || intervals["1h"];
+  return intervals[interval] || intervals["1m"];
 }
 
 export function createPairContract(
