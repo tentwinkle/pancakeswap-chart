@@ -1,30 +1,34 @@
-import type { NextRequest } from "next/server"
-import { candleAggregator } from "@/lib/candle-aggregator"
-import { createWsProvider, createPairContract } from "@/lib/pancakeswap"
-import { ethers } from "ethers"
+import type { NextRequest } from "next/server";
+import { candleAggregator } from "@/lib/candle-aggregator";
+import { createWsProvider, createPairContract } from "@/lib/pancakeswap";
+import type { ethers } from "ethers";
 
 // Ensure this route runs in a Node.js environment as it relies on the `ws`
 // package which is not compatible with the Edge runtime.
-export const runtime = "nodejs"
+export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
-  const searchParams = request.nextUrl.searchParams
-  const pair = searchParams.get("pair")
-  const interval = searchParams.get("interval")
+  const searchParams = request.nextUrl.searchParams;
+  const pair = searchParams.get("pair");
+  const interval = searchParams.get("interval");
 
   if (!pair || !interval) {
-    return new Response("Missing pair or interval", { status: 400 })
+    return new Response("Missing pair or interval", { status: 400 });
   }
 
-  const encoder = new TextEncoder()
+  const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
     async start(controller) {
-      const data = `data: ${JSON.stringify({ type: "connected", pair, interval })}\n\n`
-      controller.enqueue(encoder.encode(data))
+      const data = `data: ${JSON.stringify({
+        type: "connected",
+        pair,
+        interval,
+      })}\n\n`;
+      controller.enqueue(encoder.encode(data));
 
-      const wsProvider = createWsProvider()
-      const pairContract = createPairContract(pair, wsProvider)
+      const wsProvider = createWsProvider();
+      const pairContract = createPairContract(pair, wsProvider);
 
       const handleSwap = async (
         sender: string,
@@ -33,60 +37,67 @@ export async function GET(request: NextRequest) {
         amount0Out: ethers.BigNumberish,
         amount1Out: ethers.BigNumberish,
         to: string,
-        event: any,
+        event: any
       ) => {
         try {
-          const price = amount1In > 0
-            ? Number(amount0In) / Number(amount1In)
-            : Number(amount0Out) > 0
-              ? Number(amount0Out) / Number(amount1Out)
-              : 0
-          const volume = Math.abs(Number(amount0In) - Number(amount0Out))
-          const block = await wsProvider.getBlock(event.blockNumber)
+          const price =
+            Number(amount1In) > 0
+              ? Number(amount0Out) / Number(amount1In)
+              : Number(amount1Out) > 0
+              ? Number(amount0In) / Number(amount1Out)
+              : 0;
+          const volume = Math.abs(Number(amount1In) - Number(amount1Out));
+          const block = await wsProvider.getBlock(event.blockNumber);
           candleAggregator.addSwapEvent(
             {
-              timestamp: block.timestamp * 1000,
+              timestamp: block!.timestamp * 1000,
               price,
               volume,
               pair,
             },
-            interval,
-          )
-          const latestCandle = candleAggregator.getLatestCandle(pair, interval)
-          const latestVolume = candleAggregator.getLatestVolume(pair, interval)
+            interval
+          );
+          const latestCandle = candleAggregator.getLatestCandle(pair, interval);
+          const latestVolume = candleAggregator.getLatestVolume(pair, interval);
           if (latestCandle) {
-            const candleData = `data: ${JSON.stringify({ type: "candle", candle: latestCandle })}\n\n`
-            controller.enqueue(encoder.encode(candleData))
+            const candleData = `data: ${JSON.stringify({
+              type: "candle",
+              candle: latestCandle,
+            })}\n\n`;
+            controller.enqueue(encoder.encode(candleData));
           }
           if (latestVolume) {
-            const volumeData = `data: ${JSON.stringify({ type: "volume", volume: latestVolume })}\n\n`
-            controller.enqueue(encoder.encode(volumeData))
+            const volumeData = `data: ${JSON.stringify({
+              type: "volume",
+              volume: latestVolume,
+            })}\n\n`;
+            controller.enqueue(encoder.encode(volumeData));
           }
 
           const statsData = `data: ${JSON.stringify({
             type: "stats",
             stats: {
               lastPrice: price,
-              change24h: 0,
+              change24h: 0, // Would need historical data to calculate
               volume24h: latestVolume?.value ?? 0,
-              marketCap: 0,
+              marketCap: 0, // Would need additional data
             },
-          })}\n\n`
-          controller.enqueue(encoder.encode(statsData))
+          })}\n\n`;
+          controller.enqueue(encoder.encode(statsData));
         } catch (err) {
-          console.error("Swap event error", err)
+          console.error("Swap event error", err);
         }
-      }
+      };
 
-      pairContract.on("Swap", handleSwap)
+      pairContract.on("Swap", handleSwap);
 
       request.signal.addEventListener("abort", () => {
-        pairContract.off("Swap", handleSwap)
-        wsProvider.destroy()
-        controller.close()
-      })
+        pairContract.off("Swap", handleSwap);
+        wsProvider.destroy();
+        controller.close();
+      });
     },
-  })
+  });
 
   return new Response(stream, {
     headers: {
@@ -94,5 +105,5 @@ export async function GET(request: NextRequest) {
       "Cache-Control": "no-cache",
       Connection: "keep-alive",
     },
-  })
+  });
 }

@@ -12,12 +12,6 @@ const TIME_INTERVALS = [
   { value: "1m", label: "1 Minute" },
   { value: "5m", label: "5 Minutes" },
   { value: "15m", label: "15 Minutes" },
-  { value: "1h", label: "1 Hour" },
-  { value: "5h", label: "5 Hours" },
-  { value: "24h", label: "1 Day" },
-  { value: "7D", label: "7 Days" },
-  { value: "1M", label: "1 Month" },
-  { value: "1Y", label: "1 Year" },
 ]
 
 export default function TradingChart() {
@@ -28,7 +22,7 @@ export default function TradingChart() {
 
   const [pairs, setPairs] = useState<TradingPair[]>([])
   const [selectedPair, setSelectedPair] = useState<string>("")
-  const [selectedInterval, setSelectedInterval] = useState<string>("1h")
+  const [selectedInterval, setSelectedInterval] = useState<string>("1m")
   const [loading, setLoading] = useState(true)
   const [pairStats, setPairStats] = useState<PairStats | null>(null)
   const [connectionStatus, setConnectionStatus] = useState<"connecting" | "connected" | "disconnected">("connecting")
@@ -49,23 +43,23 @@ export default function TradingChart() {
         layout: {
           background: { color: "transparent" },
           textColor: "#d1d5db",
-      },
-      grid: {
-        vertLines: { color: "#374151" },
-        horzLines: { color: "#374151" },
-      },
-      crosshair: {
-        mode: 1,
-      },
-      rightPriceScale: {
-        borderColor: "#4b5563",
-      },
-      timeScale: {
-        borderColor: "#4b5563",
-        timeVisible: true,
-        secondsVisible: false,
-      },
-    })
+        },
+        grid: {
+          vertLines: { color: "#374151" },
+          horzLines: { color: "#374151" },
+        },
+        crosshair: {
+          mode: 1,
+        },
+        rightPriceScale: {
+          borderColor: "#4b5563",
+        },
+        timeScale: {
+          borderColor: "#4b5563",
+          timeVisible: true,
+          secondsVisible: false,
+        },
+      })
 
       const candlestickSeries = (chart as any).addCandlestickSeries({
         upColor: "#10b981",
@@ -83,7 +77,7 @@ export default function TradingChart() {
         },
         priceScaleId: "",
         scaleMargins: {
-          top: 0.8,
+          top: 0.5,
           bottom: 0,
         },
       })
@@ -252,32 +246,37 @@ export default function TradingChart() {
           <Card>
             <CardContent className="p-4">
               <div className="text-sm text-muted-foreground">Last Price</div>
-              <div className="text-lg font-semibold">${pairStats.lastPrice.toFixed(6)}</div>
+              <div className="text-lg font-semibold">
+                {pairStats.lastPrice > 0 ? `$${pairStats.lastPrice.toFixed(6)}` : "Loading..."}
+              </div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4">
               <div className="text-sm text-muted-foreground">24h Change</div>
               <div
-                className={`text-lg font-semibold flex items-center gap-1 ${
-                  pairStats.change24h >= 0 ? "text-green-500" : "text-red-500"
-                }`}
+                className={`text-lg font-semibold flex items-center gap-1 ${pairStats.change24h >= 0 ? "text-green-500" : "text-red-500"
+                  }`}
               >
                 {pairStats.change24h >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-                {pairStats.change24h?.toFixed(2)}%
+                {Math.abs(pairStats.change24h) > 0 ? `${pairStats.change24h.toFixed(2)}%` : "N/A"}
               </div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4">
               <div className="text-sm text-muted-foreground">24h Volume</div>
-              <div className="text-lg font-semibold">${pairStats.volume24h.toLocaleString()}</div>
+              <div className="text-lg font-semibold">
+                {pairStats.volume24h > 0 ? `$${pairStats.volume24h.toLocaleString()}` : "N/A"}
+              </div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4">
               <div className="text-sm text-muted-foreground">Market Cap</div>
-              <div className="text-lg font-semibold">${pairStats.marketCap.toLocaleString()}</div>
+              <div className="text-lg font-semibold">
+                {pairStats.marketCap > 0 ? `$${pairStats.marketCap.toLocaleString()}` : "N/A"}
+              </div>
             </CardContent>
           </Card>
         </div>
