@@ -152,42 +152,57 @@ export default function TradingChart() {
   useEffect(() => {
     if (!selectedPair || !selectedInterval) return
 
-    const eventSource = new EventSource(`/api/stream?pair=${selectedPair}&interval=${selectedInterval}`)
+    let eventSource: EventSource | null = null
 
-    eventSource.onopen = () => {
-      setConnectionStatus("connected")
-    }
+    const createEventSource = () => {
+      if (eventSource) {
+        eventSource.close()
+      }
 
-    eventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data)
+      eventSource = new EventSource(
+        `/api/stream?pair=${selectedPair}&interval=${selectedInterval}`,
+      )
 
-        if (data.type === "candle" && candlestickSeriesRef.current) {
-          candlestickSeriesRef.current.update(data.candle)
+      eventSource.onopen = () => {
+        setConnectionStatus("connected")
+      }
+
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data)
+
+          if (data.type === "candle" && candlestickSeriesRef.current) {
+            candlestickSeriesRef.current.update(data.candle)
+          }
+
+          if (data.type === "volume" && volumeSeriesRef.current) {
+            volumeSeriesRef.current.update(data.volume)
+          }
+
+          if (data.type === "stats") {
+            setPairStats(data.stats)
+          }
+        } catch (error) {
+          console.error("Failed to parse stream data:", error)
         }
 
-        if (data.type === "volume" && volumeSeriesRef.current) {
-          volumeSeriesRef.current.update(data.volume)
-        }
+      }
 
-        if (data.type === "stats") {
-          setPairStats(data.stats)
-        }
-      } catch (error) {
-        console.error("Failed to parse stream data:", error)
+      eventSource.onerror = () => {
+        setConnectionStatus("disconnected")
+        // Auto-reconnect after 5 seconds
+        setTimeout(() => {
+          setConnectionStatus("connecting")
+          createEventSource()
+        }, 5000)
       }
     }
-
-    eventSource.onerror = () => {
-      setConnectionStatus("disconnected")
-      // Auto-reconnect after 5 seconds
-      setTimeout(() => {
-        setConnectionStatus("connecting")
-      }, 5000)
-    }
+    createEventSource()
 
     return () => {
-      eventSource.close()
+      if (eventSource) {
+        eventSource.close()
+      }
     }
   }, [selectedPair, selectedInterval])
 
