@@ -78,9 +78,7 @@ export async function GET(request: NextRequest) {
             type: "stats",
             stats: {
               lastPrice: price,
-              change24h: 0, // Would need historical data to calculate
               volume24h: latestVolume?.value ?? 0,
-              marketCap: 0, // Would need additional data
             },
           })}\n\n`;
           controller.enqueue(encoder.encode(statsData));

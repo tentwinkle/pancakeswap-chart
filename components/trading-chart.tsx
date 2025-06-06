@@ -180,7 +180,10 @@ export default function TradingChart() {
           }
 
           if (data.type === "stats") {
-            setPairStats(data.stats)
+            setPairStats((prev) => ({
+              ...prev,
+              ...data.stats,
+            }))
           }
         } catch (error) {
           console.error("Failed to parse stream data:", error)
