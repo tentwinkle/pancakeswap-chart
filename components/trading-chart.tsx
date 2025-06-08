@@ -75,13 +75,11 @@ export default function TradingChart() {
       })
 
       const volumeSeries = (chart as any).addHistogramSeries({
-        color: "#6b7280",
         priceFormat: {
           type: "volume",
         },
         priceScaleId: "volume",
       })
-
       ;(chart as any).priceScale("volume").applyOptions({
         scaleMargins: {
           top: 0.7,
@@ -166,9 +164,7 @@ export default function TradingChart() {
         eventSource.close()
       }
 
-      eventSource = new EventSource(
-        `/api/stream?pair=${selectedPair}&interval=${selectedInterval}`,
-      )
+      eventSource = new EventSource(`/api/stream?pair=${selectedPair}&interval=${selectedInterval}`)
 
       eventSource.onopen = () => {
         setConnectionStatus("connected")
@@ -183,7 +179,12 @@ export default function TradingChart() {
           }
 
           if (data.type === "volume" && volumeSeriesRef.current) {
-            volumeSeriesRef.current.update(data.volume)
+            // Ensure the volume data has the proper color based on price movement
+            const volumeData = {
+              ...data.volume,
+              color: data.volume.color || "#6b7280",
+            }
+            volumeSeriesRef.current.update(volumeData)
           }
 
           if (data.type === "stats") {
@@ -195,7 +196,6 @@ export default function TradingChart() {
         } catch (error) {
           console.error("Failed to parse stream data:", error)
         }
-
       }
 
       eventSource.onerror = () => {
@@ -280,8 +280,9 @@ export default function TradingChart() {
             <CardContent className="p-4">
               <div className="text-sm text-muted-foreground">24h Change</div>
               <div
-                className={`text-lg font-semibold flex items-center gap-1 ${pairStats.change24h >= 0 ? "text-green-500" : "text-red-500"
-                  }`}
+                className={`text-lg font-semibold flex items-center gap-1 ${
+                  pairStats.change24h >= 0 ? "text-green-500" : "text-red-500"
+                }`}
               >
                 {pairStats.change24h >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
                 {Math.abs(pairStats.change24h) > 0 ? `${pairStats.change24h.toFixed(2)}%` : "N/A"}
