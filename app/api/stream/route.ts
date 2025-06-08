@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server"
 import { candleAggregator } from "@/lib/candle-aggregator"
-import { createWsProvider, createPairContract } from "@/lib/pancakeswap"
-import type { ethers } from "ethers"
+import { createWsProvider, createPairContract, ERC20_ABI } from "@/lib/pancakeswap"
+import { ethers } from "ethers"
 
 // Ensure this route runs in a Node.js environment as it relies on the `ws`
 // package which is not compatible with the Edge runtime.
@@ -29,6 +29,17 @@ export async function GET(request: NextRequest) {
 
       const wsProvider = createWsProvider()
       const pairContract = createPairContract(pair, wsProvider)
+      let closed = false
+
+      const [token0Addr, token1Addr] = await Promise.all([pairContract.token0(), pairContract.token1()])
+      const token0 = new ethers.Contract(token0Addr, ERC20_ABI, wsProvider)
+      const token1 = new ethers.Contract(token1Addr, ERC20_ABI, wsProvider)
+      const [dec0Raw, dec1Raw] = await Promise.all([
+        token0.decimals(),
+        token1.decimals(),
+      ])
+      const dec0 = Number(dec0Raw)
+      const dec1 = Number(dec1Raw)
 
       const handleSwap = async (
         sender: string,
@@ -39,16 +50,21 @@ export async function GET(request: NextRequest) {
         to: string,
         event: any,
       ) => {
+        if (closed) return
         try {
+          const a0In = Number(ethers.formatUnits(amount0In, dec0))
+          const a1In = Number(ethers.formatUnits(amount1In, dec1))
+          const a0Out = Number(ethers.formatUnits(amount0Out, dec0))
+          const a1Out = Number(ethers.formatUnits(amount1Out, dec1))
+
           const price =
-            Number(amount1In) > 0
-              ? Number(amount0Out) / Number(amount1In)
-              : Number(amount1Out) > 0
-                ? Number(amount0In) / Number(amount1Out)
+            a1In > 0
+              ? a0Out / a1In
+              : a1Out > 0
+                ? a0In / a1Out
                 : 0
 
-          // Calculate volume with proper scaling to match historical data
-          const volume = Math.abs(Number(amount1In) - Number(amount1Out)) / 100000 // Scale down to match historical
+          const volume = Math.abs(a1In - a1Out)
 
           const block = await wsProvider.getBlock(event.blockNumber)
           candleAggregator.addSwapEvent(
@@ -104,6 +120,7 @@ export async function GET(request: NextRequest) {
       request.signal.addEventListener("abort", () => {
         pairContract.off("Swap", handleSwap)
         wsProvider.destroy()
+        closed = true
         controller.close()
       })
     },

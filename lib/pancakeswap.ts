@@ -87,8 +87,15 @@ export async function fetchHistoricalCandles(
   const intervalMs = getIntervalMs(interval);
   const endTime = Math.floor(Date.now() / 1000);
   const startTime = endTime - Math.floor((intervalMs * limit) / 1000);
+  const infoQuery = `{
+    pair(id: "${pairAddress}") {
+      token0 { decimals }
+      token1 { decimals }
+    }
+  }`;
 
-  const query = `{
+
+  const swapsQuery = `{
     swaps(first: 1000, orderBy: timestamp, orderDirection: asc, where: { pair: \"${pairAddress}\", timestamp_gt: ${startTime} }) {
       amount0In
       amount1In
@@ -99,25 +106,38 @@ export async function fetchHistoricalCandles(
   }`;
 
   try {
-    const res = await fetch(PANCAKESWAP_SUBGRAPH_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query }),
-    });
-    const json = await res.json();
-    const swaps = json.data.swaps as Array<any>;
+    const [infoRes, swapsRes] = await Promise.all([
+      fetch(PANCAKESWAP_SUBGRAPH_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: infoQuery }),
+      }),
+      fetch(PANCAKESWAP_SUBGRAPH_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: swapsQuery }),
+      }),
+    ]);
+    const infoJson = await infoRes.json();
+    const swapsJson = await swapsRes.json();
+    const dec0 = Number(infoJson.data.pair.token0.decimals);
+    const dec1 = Number(infoJson.data.pair.token1.decimals);
+    const swaps = swapsJson.data.swaps as Array<any>;
 
     const candles: CandleData[] = [];
     const volumes: VolumeData[] = [];
     const grouped: Record<number, any[]> = {};
 
     for (const swap of swaps) {
-      const price =
-        swap.amount1In > 0
-          ? Number(swap.amount0Out) / Number(swap.amount1In)
-          : Number(swap.amount0In) / Number(swap.amount1Out);
+      const amount0In = Number(swap.amount0In) / 10 ** dec0;
+      const amount1In = Number(swap.amount1In) / 10 ** dec1;
+      const amount0Out = Number(swap.amount0Out) / 10 ** dec0;
+      const amount1Out = Number(swap.amount1Out) / 10 ** dec1;
 
-      const volume = Math.abs(Number(swap.amount1In) - Number(swap.amount1Out));
+      const price =
+        amount1In > 0 ? amount0Out / amount1In : amount0In / amount1Out;
+
+      const volume = Math.abs(amount1In - amount1Out);
       const bucket =
         Math.floor((Number(swap.timestamp) * 1000) / intervalMs) * intervalMs;
       if (!grouped[bucket]) grouped[bucket] = [];
@@ -169,9 +189,25 @@ export function createPairContract(
 export async function fetchPairPrice(pairAddress: string): Promise<number> {
   try {
     const pairContract = createPairContract(pairAddress);
-    const reserves = await pairContract.getReserves();
-    // Calculate price as reserve1/reserve0 (assuming token1/token0)
-    const price = Number(reserves[1]) / Number(reserves[0]);
+    const [reserves, token0Addr, token1Addr] = await Promise.all([
+      pairContract.getReserves(),
+      pairContract.token0(),
+      pairContract.token1(),
+    ]);
+
+    const token0 = new ethers.Contract(token0Addr, ERC20_ABI, getProvider());
+    const token1 = new ethers.Contract(token1Addr, ERC20_ABI, getProvider());
+    const [dec0Raw, dec1Raw] = await Promise.all([
+      token0.decimals(),
+      token1.decimals(),
+    ]);
+    const dec0 = Number(dec0Raw);
+    const dec1 = Number(dec1Raw);
+
+    const reserve0 = Number(ethers.formatUnits(reserves[0], dec0));
+    const reserve1 = Number(ethers.formatUnits(reserves[1], dec1));
+
+    const price = reserve1 > 0 ? reserve0 / reserve1 : 0;
     return price;
   } catch (error) {
     console.error("Error fetching pair price:", error);
