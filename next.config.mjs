@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
-    serverComponentsExternalPackages: ['lightweight-charts'],
+    serverComponentsExternalPackages: ['highcharts'],
   },
   eslint: {
     ignoreDuringBuilds: true,

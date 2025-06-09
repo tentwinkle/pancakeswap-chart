@@ -13,18 +13,21 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const intervalMs = getIntervalMs(interval)
+    const candlesPerDay = Math.floor((24 * 60 * 60 * 1000) / intervalMs)
+    const limit = Math.max(200, candlesPerDay)
+
     // Fetch historical candles and volumes
-    const { candles: historicalCandles, volumes: historicalVolumes } =
-      await fetchHistoricalCandles(pair, interval)
+    const { candles: historicalCandles, volumes: historicalVolumes } = await fetchHistoricalCandles(pair, interval, limit)
 
     // Get real-time candles from aggregator
-    const realtimeCandles = candleAggregator.getCandles(pair, interval)
+    const realtimeCandles = candleAggregator.getCandles(pair, interval, limit)
 
     // Combine historical and real-time data
-    const allCandles = [...historicalCandles, ...realtimeCandles].sort((a, b) => a.time - b.time).slice(-200) // Keep last 200 candles
+    const combinedCandles = [...historicalCandles, ...realtimeCandles].sort((a, b) => a.time - b.time)
 
     // Generate volume data (simplified)
-    const realtimeVolumes = candleAggregator.getVolumes(pair, interval)
+    const realtimeVolumes = candleAggregator.getVolumes(pair, interval, limit)
     const volumeMap: Record<number, number> = {}
     for (const vol of historicalVolumes) {
       volumeMap[vol.time] = vol.value
@@ -32,36 +35,48 @@ export async function GET(request: NextRequest) {
     for (const vol of realtimeVolumes) {
       volumeMap[vol.time] = (volumeMap[vol.time] || 0) + vol.value
     }
-    const volumeData = allCandles.map((candle) => ({
+    const volumeDataFull = combinedCandles.map((candle) => ({
       time: candle.time,
       value: volumeMap[candle.time] || 0,
       color: candle.close > candle.open ? "#10b981" : "#ef4444",
     }))
-    
+
+    const slicedCandles = combinedCandles.slice(-200)
+    const slicedVolume = volumeDataFull.slice(-200)
+
     // Get current price and pair info
     const [currentPrice, pairInfo] = await Promise.all([fetchPairPrice(pair), fetchPairInfo(pair)])
 
     // Calculate stats
-    const lastCandle = allCandles[allCandles.length - 1]
-    const firstCandle = allCandles[0]
-    
     // Use current price if available, otherwise use last candle close
-    const actualLastPrice = currentPrice > 0 ? currentPrice : lastCandle?.close || 0
+    const actualLastPrice = currentPrice > 0 ? currentPrice : combinedCandles[combinedCandles.length - 1]?.close || 0
 
-    // Calculate 24h change
+    // Calculate 24h change - find candle from 24 hours ago
     let change24h = 0
-    if (firstCandle && actualLastPrice > 0) {
-      change24h = ((actualLastPrice - firstCandle.open) / firstCandle.open) * 100
+    if (combinedCandles.length > 0) {
+      // Find the candle closest to 24 hours ago
+      const oldestCandle =
+        combinedCandles.length > candlesPerDay ? combinedCandles[combinedCandles.length - candlesPerDay] : combinedCandles[0]
+      if (oldestCandle && actualLastPrice > 0) {
+        change24h = ((actualLastPrice - oldestCandle.open) / oldestCandle.open) * 100
+      }
     }
 
-    // Calculate volume over the last 24 hours based on interval
-    const candlesPerDay = Math.floor((24 * 60 * 60 * 1000) / getIntervalMs(interval))
-    const volume24h = volumeData
-      .slice(-candlesPerDay)
-      .reduce((acc, v) => acc + v.value, 0)
+    // Calculate volume over the last 24 hours
+    const volume24h = volumeDataFull.slice(-candlesPerDay).reduce((acc, v) => acc + v.value, 0)
 
-    // Calculate market cap (simplified - would need token supply data)
-    const marketCap = pairInfo ? Number.parseFloat(pairInfo.reserveUSD) * 2 : 0 // Rough estimate
+    // Calculate market cap using pair info
+    let marketCap = 0
+    if (pairInfo) {
+      // Use reserveUSD as a proxy for market cap
+      marketCap = Number.parseFloat(pairInfo.reserveUSD || "0")
+
+      // If token0 is the base token, use its total liquidity * price
+      if (pairInfo.token0 && pairInfo.token0.totalLiquidity) {
+        const totalSupply = Number.parseFloat(pairInfo.token0.totalLiquidity)
+        marketCap = totalSupply * actualLastPrice
+      }
+    }
 
     const stats: PairStats = {
       lastPrice: actualLastPrice,
@@ -71,8 +86,8 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({
-      candles: allCandles,
-      volume: volumeData,
+      candles: slicedCandles,
+      volume: slicedVolume,
       stats,
     })
   } catch (error) {

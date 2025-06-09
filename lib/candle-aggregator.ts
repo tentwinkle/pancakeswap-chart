@@ -75,13 +75,25 @@ export class CandleAggregator {
   }
 
   getLatestCandle(pair: string, interval: string): CandleData | null {
-    const candles = this.getCandles(pair, interval, 1)
-    return candles.length > 0 ? candles[0] : null
+    const candleKey = `${pair}-${interval}`
+    const pairCandles = this.candles.get(candleKey)
+
+    if (!pairCandles || pairCandles.size === 0) return null
+
+    // Get the most recent candle by timestamp
+    const sortedCandles = Array.from(pairCandles.values()).sort((a, b) => b.time - a.time)
+    return sortedCandles[0] || null
   }
 
   getLatestVolume(pair: string, interval: string): VolumeData | null {
-    const volumes = this.getVolumes(pair, interval, 1)
-    return volumes.length > 0 ? volumes[0] : null
+    const candleKey = `${pair}-${interval}`
+    const pairVolumes = this.volumes.get(candleKey)
+
+    if (!pairVolumes || pairVolumes.size === 0) return null
+
+    // Get the most recent volume by timestamp
+    const sortedVolumes = Array.from(pairVolumes.values()).sort((a, b) => b.time - a.time)
+    return sortedVolumes[0] || null
   }
 }
 
